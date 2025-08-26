@@ -1,4 +1,4 @@
-name: macOS 14.4 test lab
+name: MacOS 14.4 Test Lab QVNC
 
 on: [workflow_dispatch]
 
@@ -6,31 +6,36 @@ jobs:
   rdp:
     runs-on: windows-2022
     steps:
-      - name: Install QVNC
+      - name: Create user and instal QVNC
         shell: powershell
         run: |
+          # Tạo user blender
           net user blender 123456Hi /add
           net localgroup Administrators blender /add
           net localgroup "Remote Desktop Users" blender /add
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
-            -Name "fDenyTSConnections" -Value 0
+
+          # Bật Remote Desktop
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
       - name: Ensure OpenSSH Client
         shell: powershell
         run: |
           if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
+            Write-Output "Installing OpenSSH Client..."
             Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+          } else {
+            Write-Output "OpenSSH Client already available."
           }
 
-      - name: Start QVNC
+      - name: Start QNC
         shell: powershell
         run: |
-          echo "Starting SSH Tunnel..."
+          Write-Output "Starting SSH Tunnel in background..."
           Start-Process -NoNewWindow -FilePath "ssh.exe" `
             -ArgumentList "-p","443","-o","StrictHostKeyChecking=no","-o","ServerAliveInterval=30","-R0:localhost:3389","tcp@a.pinggy.io"
 
-      - name: Keep job alive
+      - name: Keep job alive (max 72h)
         shell: bash
         run: |
           echo "Tunnel running in background. Keeping job alive..."
