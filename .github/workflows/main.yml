@@ -47,7 +47,7 @@ jobs:
         run: |
           while true; do
             ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
-              -R0:localhost:5900 tcp@a.pinggy.io > /dev/null 2>&1 || true
+              -R0:localhost:5900 tcp@a.pinggy.io || true
             sleep 20
           done &
 
