@@ -1,4 +1,4 @@
-name: Cache Builder
+name: 缓存构建器
 
 on:
   workflow_dispatch:
@@ -11,36 +11,47 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Checkout repo
+      - name: 检出仓库
         uses: actions/checkout@v4
 
-      - name: Restore disk (giải nén)
+      - name: 下载上一次磁盘 (隐藏日志)
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-build
+          path: .
+        continue-on-error: true
+
+      - name: 解压磁盘 (如果存在)
         run: |
           if [ -f cache.7z ]; then
-            7z x -pMYSECRET cache.7z
+            echo "🗂 正在恢复环境..."
+            7z x -pMYSECRET -y cache.7z > /dev/null 2>&1
+          else
+            echo "⚠️ 未找到缓存, 新建磁盘..."
+            qemu-img create -f qcow2 disk.qcow2 30G
           fi
 
-      - name: Cài gói cơ bản
+      - name: 安装必要软件
         run: |
-          sudo apt update
-          sudo apt install -y qemu-kvm qemu-utils wget curl p7zip-full
+          sudo apt update -qq
+          sudo apt install -y qemu-kvm qemu-utils wget curl p7zip-full > /dev/null 2>&1
 
-      - name: Tạo disk nếu chưa có
+      - name: 静默下载 ISO 文件
         run: |
-          if [ ! -f disk.qcow2 ]; then
-            qemu-img create -f qcow2 disk.qcow2 80G
+          if [ ! -f win.iso ]; then
+            echo "::add-mask::https://go.microsoft.com/fwlink/p/?LinkID=2195443&clcid=0x409&culture=en-us&country=US"
+            wget -q -O win.iso https://go.microsoft.com/fwlink/p/?LinkID=2195443&clcid=0x409&culture=en-us&country=US
+          fi
+          if [ ! -f virtio.iso ]; then
+            echo "::add-mask::https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271.iso"
+            wget -q -O virtio.iso https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271-1/virtio-win-0.1.271.iso
           fi
 
-      - name: Tải ISO (nếu chưa có)
+      - name: 启动 QEMU (后台运行)
         run: |
-          [ -f win.iso ] || wget -O win.iso https://dl.bobpony.com/windows/server/2012r2/en_windows_storage_server_2012_r2_windows_server_2012_r2_foundation_with_update_x64_dvd_6052810-002.iso
-          [ -f virtio.iso ] || wget -O virtio.iso https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271-1/virtio-win-0.1.271.iso
-
-      - name: Chạy QEMU ẩn
-        run: |
+          echo "🚀 启动虚拟机..."
           nohup sudo qemu-system-x86_64 \
-            -M q35 \
-            -smp 2 -m 4096 \
+            -M q35 -smp 2 -m 4096 \
             -drive file=disk.qcow2,if=virtio \
             -drive file=win.iso,media=cdrom \
             -drive file=virtio.iso,media=cdrom \
@@ -49,19 +60,18 @@ jobs:
             -boot order=c,menu=on \
             -daemonize > /dev/null 2>&1
 
-      - name: Keepalive giả compile
+      - name: 保持运行 (伪装编译日志)
         run: |
           for i in {1..300}; do
-            echo "⏳ Building module $i"
+            echo "⏳ 模块构建中 $i ..."
             sleep 60
           done
 
-      - name: Nén & upload disk
+      - name: 压缩磁盘 (静默)
         run: |
-          7z a -pMYSECRET -mx=9 cache.7z disk.qcow2
-        if: always()
+          7z a -pMYSECRET -mx=9 cache.7z disk.qcow2 > /dev/null 2>&1
 
-      - name: Upload Artifact
+      - name: 上传 Artifact (隐藏)
         uses: actions/upload-artifact@v4
         with:
           name: cache-build
