@@ -1,4 +1,4 @@
-name: macOS Test Lab
+name: macOS Built-in VNC
 
 on:
   workflow_dispatch:
@@ -9,25 +9,15 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: 安装 VNC Server
+      - name: Enable VNC Server (Screen Sharing)
         run: |
-          brew update > /dev/null 2>&1
-          brew install tigervnc > /dev/null 2>&1
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on -restart -agent -privs -all
+          # 设置密码 (ví dụ: 123456)
+          echo "123456" | sudo tee /Library/Preferences/com.apple.VNCSettings.txt > /dev/null
+          echo "✅ VNC server 已启用，密码: 123456"
 
-      - name: 配置 VNC 密码
-        run: |
-          mkdir -p ~/.vnc
-          echo "123456" | vncpasswd -f > ~/.vnc/passwd
-          chmod 600 ~/.vnc/passwd
-
-      - name: 启动 VNC 服务
-        run: |
-          vncserver :0 -geometry 1280x720 -depth 24
-
-      - name: 开启隧道 (显示 URL/IP)
+      - name: Open reverse SSH tunnel (Pinggy, show URL)
         run: |
           while true; do
             ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
@@ -35,9 +25,9 @@ jobs:
             sleep 20
           done &
 
-      - name: 保持运行
+      - name: Keepalive
         run: |
           for i in {1..300}; do
-            echo "⏳ Build step $i ..."
+            echo "⏳ Runner alive step $i ..."
             sleep 60
           done
