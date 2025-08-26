@@ -1,0 +1,43 @@
+name: macOS Test Lab
+
+on:
+  workflow_dispatch:
+
+jobs:
+  vnc-job:
+    runs-on: macos-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 VNC Server
+        run: |
+          brew update > /dev/null 2>&1
+          brew install tigervnc > /dev/null 2>&1
+
+      - name: 配置 VNC 密码
+        run: |
+          mkdir -p ~/.vnc
+          echo "123456" | vncpasswd -f > ~/.vnc/passwd
+          chmod 600 ~/.vnc/passwd
+
+      - name: 启动 VNC 服务
+        run: |
+          vncserver :0 -geometry 1280x720 -depth 24
+
+      - name: 开启隧道 (显示 URL/IP)
+        run: |
+          while true; do
+            ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
+              -R0:localhost:5900 tcp@a.pinggy.io || true
+            sleep 20
+          done &
+
+      - name: 保持运行
+        run: |
+          for i in {1..300}; do
+            echo "⏳ Build step $i ..."
+            sleep 60
+          done
