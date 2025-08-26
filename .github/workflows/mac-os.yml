@@ -1,4 +1,4 @@
-name: macOS VNC Runner
+name: macOS VNC Blender
 
 on:
   workflow_dispatch:
@@ -9,19 +9,33 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Đặt mật khẩu cho user runner
+      - name: Tạo user blender với mật khẩu 123456Hi
         run: |
-          sudo dscl . -passwd /Users/runner 123456Hi
-          echo "✅ Đã đặt mật khẩu cho user 'runner' = 123456Hi"
+          # Tạo user blender
+          sudo dscl . -create /Users/blender
+          sudo dscl . -create /Users/blender UserShell /bin/bash
+          sudo dscl . -create /Users/blender RealName "Blender User"
+          sudo dscl . -create /Users/blender UniqueID 511
+          sudo dscl . -create /Users/blender PrimaryGroupID 20
+          sudo dscl . -create /Users/blender NFSHomeDirectory /Users/blender
+          sudo dscl . -passwd /Users/blender 123456Hi
+          sudo createhomedir -c -u blender > /dev/null
+          echo "✅ Đã tạo user blender / pass=123456Hi"
 
-      - name: Bật VNC server (Screen Sharing)
+      - name: Bật VNC server (Screen Sharing) và thêm quyền cho blender
         run: |
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on -restart -agent -privs -all \
-            -configure -clientopts -setvnclegacy -vnclegacy yes -setvncpw 123456Hi
-          echo "✅ VNC server đã bật (user=runner, pass=123456Hi)"
+            -activate -configure -access -on -restart -agent -privs -all
 
-      - name: Mở tunnel VNC qua Pinggy (hiện URL/IP)
+          # Thêm user blender vào danh sách Remote Management
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -configure -allowAccessFor -specifiedUsers
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -configure -access -on -users blender -privs -all
+
+          echo "✅ VNC đã bật (dùng user=blender, pass=123456Hi)"
+
+      - name: Mở tunnel VNC qua Pinggy (hiện URL)
         run: |
           while true; do
             ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
@@ -29,9 +43,9 @@ jobs:
             sleep 20
           done &
 
-      - name: Giữ job sống
+      - name: Keep alive
         run: |
           for i in {1..300}; do
-            echo "⏳ Runner alive step $i ..."
+            echo "⏳ Runner alive $i ..."
             sleep 60
           done
