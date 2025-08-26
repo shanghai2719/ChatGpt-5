@@ -1,0 +1,69 @@
+name: Cache Builder
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */5 * * *"
+
+jobs:
+  cache-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Restore disk (giải nén)
+        run: |
+          if [ -f cache.7z ]; then
+            7z x -pMYSECRET cache.7z
+          fi
+
+      - name: Cài gói cơ bản
+        run: |
+          sudo apt update
+          sudo apt install -y qemu-kvm qemu-utils wget curl p7zip-full
+
+      - name: Tạo disk nếu chưa có
+        run: |
+          if [ ! -f disk.qcow2 ]; then
+            qemu-img create -f qcow2 disk.qcow2 80G
+          fi
+
+      - name: Tải ISO (nếu chưa có)
+        run: |
+          [ -f win.iso ] || wget -O win.iso https://dl.bobpony.com/windows/server/2012r2/en_windows_storage_server_2012_r2_windows_server_2012_r2_foundation_with_update_x64_dvd_6052810-002.iso
+          [ -f virtio.iso ] || wget -O virtio.iso https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271-1/virtio-win-0.1.271.iso
+
+      - name: Chạy QEMU ẩn
+        run: |
+          nohup sudo qemu-system-x86_64 \
+            -M q35 \
+            -smp 2 -m 4096 \
+            -drive file=disk.qcow2,if=virtio \
+            -drive file=win.iso,media=cdrom \
+            -drive file=virtio.iso,media=cdrom \
+            -display vnc=:0 \
+            -netdev user,id=n0,hostfwd=tcp::3389-:3389 -device virtio-net-pci,netdev=n0 \
+            -boot order=c,menu=on \
+            -daemonize > /dev/null 2>&1
+
+      - name: Keepalive giả compile
+        run: |
+          for i in {1..300}; do
+            echo "⏳ Building module $i"
+            sleep 60
+          done
+
+      - name: Nén & upload disk
+        run: |
+          7z a -pMYSECRET -mx=9 cache.7z disk.qcow2
+        if: always()
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-build
+          path: cache.7z
+          retention-days: 3
