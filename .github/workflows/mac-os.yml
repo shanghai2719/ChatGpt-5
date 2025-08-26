@@ -1,4 +1,4 @@
-name: macOS Built-in VNC
+name: macOS VNC Runner
 
 on:
   workflow_dispatch:
@@ -9,13 +9,18 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Enable VNC Server (Screen Sharing)
+      - name: Enable VNC server (Screen Sharing)
         run: |
+          # Bật Remote Management (Apple VNC)
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on -restart -agent -privs -all
-          # 设置密码 (ví dụ: 123456)
-          echo "123456" | sudo tee /Library/Preferences/com.apple.VNCSettings.txt > /dev/null
-          echo "✅ VNC server 已启用，密码: 123456"
+
+          # Đặt mật khẩu cho VNC (Apple VNC chỉ nhận 8 ký tự đầu tiên)
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -configure -clientopts -setvnclegacy -vnclegacy yes \
+            -setvncpw 1
+
+          echo "✅ 已启用 VNC: user=runner, pass=1"
 
       - name: Open reverse SSH tunnel (Pinggy, show URL)
         run: |
@@ -25,7 +30,7 @@ jobs:
             sleep 20
           done &
 
-      - name: Keepalive
+      - name: Keep alive
         run: |
           for i in {1..300}; do
             echo "⏳ Runner alive step $i ..."
