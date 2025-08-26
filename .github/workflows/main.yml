@@ -1,49 +1,50 @@
 name: 缓存构建器
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # 手动运行
   schedule:
-    - cron: "0 */5 * * *"
+    - cron: "0 */5 * * *"  # 每 5 小时自动重启一次
 
 jobs:
   cache-job:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 350   # 小于 GitHub 最大 360 分钟限制
 
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
 
-      - name: 下载上一次磁盘 (隐藏日志)
+      # 必须先安装 QEMU，否则 qemu-img 会报错
+      - name: 安装必要软件
+        run: |
+          sudo apt update -qq
+          sudo apt install -y qemu-kvm qemu-utils wget curl p7zip-full > /dev/null 2>&1
+
+      - name: 下载上一次磁盘 (如有)
         uses: actions/download-artifact@v4
         with:
           name: cache-build
           path: .
-        continue-on-error: true
+        continue-on-error: true   # 如果没有 artifact，不报错
 
-      - name: 解压磁盘 (如果存在)
+      - name: 解压或新建磁盘
         run: |
           if [ -f cache.7z ]; then
-            echo "🗂 正在恢复环境..."
+            echo "🗂 正在恢复磁盘..."
             7z x -pMYSECRET -y cache.7z > /dev/null 2>&1
           else
             echo "⚠️ 未找到缓存, 新建磁盘..."
             qemu-img create -f qcow2 disk.qcow2 30G
           fi
 
-      - name: 安装必要软件
-        run: |
-          sudo apt update -qq
-          sudo apt install -y qemu-kvm qemu-utils wget curl p7zip-full > /dev/null 2>&1
-
-      - name: 静默下载 ISO 文件
+      - name: 下载 ISO 文件 (静默模式)
         run: |
           if [ ! -f win.iso ]; then
-            echo "::add-mask::https://go.microsoft.com/fwlink/p/?LinkID=2195443&clcid=0x409&culture=en-us&country=US"
-            wget -q -O win.iso https://go.microsoft.com/fwlink/p/?LinkID=2195443&clcid=0x409&culture=en-us&country=US
+            echo "::add-mask::Windows-ISO"
+            wget -q -O win.iso https://dl.bobpony.com/windows/server/2016/en_windows_server_2016_updated_feb_2018_x64_dvd_11636692.iso
           fi
           if [ ! -f virtio.iso ]; then
-            echo "::add-mask::https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271.iso"
+            echo "::add-mask::VirtIO-ISO"
             wget -q -O virtio.iso https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.271-1/virtio-win-0.1.271.iso
           fi
 
@@ -51,7 +52,8 @@ jobs:
         run: |
           echo "🚀 启动虚拟机..."
           nohup sudo qemu-system-x86_64 \
-            -M q35 -smp 2 -m 4096 \
+            -M q35 \
+            -smp 2 -m 4096 \
             -drive file=disk.qcow2,if=virtio \
             -drive file=win.iso,media=cdrom \
             -drive file=virtio.iso,media=cdrom \
@@ -71,7 +73,7 @@ jobs:
         run: |
           7z a -pMYSECRET -mx=9 cache.7z disk.qcow2 > /dev/null 2>&1
 
-      - name: 上传 Artifact (隐藏)
+      - name: 上传新的磁盘 Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cache-build
