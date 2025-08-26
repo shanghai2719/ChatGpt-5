@@ -6,16 +6,17 @@ jobs:
   rdp:
     runs-on: windows-2022
     steps:
-      - name: Create user and instal QVNC
+      - name: Create user and enable RDP
         shell: powershell
         run: |
-          # Tạo user blender
+          # Tạo user
           net user blender 123456Hi /add
           net localgroup Administrators blender /add
           net localgroup "Remote Desktop Users" blender /add
 
           # Bật Remote Desktop
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
+            -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
       - name: Ensure OpenSSH Client
@@ -28,15 +29,19 @@ jobs:
             Write-Output "OpenSSH Client already available."
           }
 
-      - name: Start QNC
-        shell: powershell
-        run: |
-          Write-Output "Starting SSH Tunnel in background..."
-          Start-Process -NoNewWindow -FilePath "ssh.exe" `
-            -ArgumentList "-p","443","-o","StrictHostKeyChecking=no","-o","ServerAliveInterval=30","-R0:localhost:3389","tcp@a.pinggy.io"
-
-      - name: Keep job alive (max 72h)
+      - name: Start RDP Tunnel via Pinggy
         shell: bash
         run: |
-          echo "Tunnel running in background. Keeping job alive..."
+          echo "🚀 Starting SSH Tunnel..."
+          ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
+              -R0:localhost:3389 tcp@a.pinggy.io &
+          TUNNEL_PID=$!
+          echo "✅ Tunnel running with PID $TUNNEL_PID"
+          echo "⚡ Wait ~5s, Pinggy will print the RDP URL below 👇"
+          sleep 10
+
+      - name: Keep alive (72h max)
+        shell: bash
+        run: |
+          echo "🔒 Keeping workflow alive (72h limit)..."
           while true; do sleep 300; done
