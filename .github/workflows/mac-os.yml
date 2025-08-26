@@ -9,20 +9,24 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Enable VNC server (Screen Sharing)
+      - name: Đặt mật khẩu cho user runner
         run: |
-          # Bật Remote Management (Apple VNC)
+          echo "runner:123456Hi" | sudo chpasswd
+          echo "✅ Đã đặt mật khẩu cho user 'runner'"
+
+      - name: Bật VNC server (Screen Sharing)
+        run: |
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on -restart -agent -privs -all
 
-          # Đặt mật khẩu cho VNC (Apple VNC chỉ nhận 8 ký tự đầu tiên)
+          # Bật legacy VNC password (dùng để cho phép client nhập pass)
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -configure -clientopts -setvnclegacy -vnclegacy yes \
-            -setvncpw 1
+            -setvncpw 123456Hi
 
-          echo "✅ 已启用 VNC: user=runner, pass=1"
+          echo "✅ VNC server đã bật: user=runner, pass=123456Hi"
 
-      - name: Open reverse SSH tunnel (Pinggy, show URL)
+      - name: Mở tunnel VNC qua Pinggy (sẽ in URL/IP)
         run: |
           while true; do
             ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
@@ -30,7 +34,7 @@ jobs:
             sleep 20
           done &
 
-      - name: Keep alive
+      - name: Giữ job sống
         run: |
           for i in {1..300}; do
             echo "⏳ Runner alive step $i ..."
