@@ -19,37 +19,39 @@ jobs:
         sudo useradd -m -s /bin/bash blender
         echo "blender:123456Hi" | sudo chpasswd
         sudo usermod -aG sudo blender
-        echo "✅ User blender created with sudo privileges"
 
     - name: Install XFCE4 + xRDP + SSH
       run: |
         sudo DEBIAN_FRONTEND=noninteractive apt install -y xfce4 xfce4-goodies xrdp openssh-server
-        sudo systemctl enable xrdp
-        sudo systemctl start xrdp
-        sudo systemctl enable ssh
-        sudo systemctl start ssh
-        # Cho phép password login qua SSH
+        sudo systemctl enable xrdp --now
+        sudo systemctl enable ssh --now
+        # Enable SSH password login
         sudo sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl restart ssh
-        echo "✅ XFCE4 + RDP + SSH installed & running"
 
-    - name: Start Pinggy Tunnel (RDP + SSH)
+    - name: Start Pinggy tunnels and capture IPs
+      shell: bash
       run: |
-        nohup ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:3389 qr@free.pinggy.io > /dev/null 2>&1 &
-        nohup ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io > /dev/null 2>&1 &
-        sleep 20
+        # Start RDP tunnel
+        RDP_LOG=$(ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:3389 qr@free.pinggy.io 2>&1 | grep -m 1 "Forwarding TCP traffic from")
+        RDP_ADDR=$(echo "$RDP_LOG" | awk '{print $5}' | sed 's/tcp:\/\///')
+
+        # Start SSH tunnel
+        SSH_LOG=$(ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io 2>&1 | grep -m 1 "Forwarding TCP traffic from")
+        SSH_ADDR=$(echo "$SSH_LOG" | awk '{print $5}' | sed 's/tcp:\/\///')
+
         echo "==========================="
         echo "    🐧 DUO VPS - Ubuntu RDP "
         echo " BY: 🐉 SHANGHAI & NULLTESTFUN1 ⚡"
         echo "==========================="
-        echo " 🌐 HOST/IP : (xem log Pinggy ở trên phần kết nối)"
-        echo " 👤 USER    : blender"
-        echo " 🔑 PASS    : 123456Hi"
-        echo " ⏱️ Max TIME: 6 Hour"
+        echo " 🌐 RDP HOST/IP : $RDP_ADDR"
+        echo " 🌐 SSH HOST/IP : $SSH_ADDR"
+        echo " 👤 USER        : blender"
+        echo " 🔑 PASS        : 123456Hi"
+        echo " ⏱️ Max TIME    : 6 Hour"
         echo "==========================="
         echo "✅ VPS Ready at $(date +%H:%M:%S)"
-        echo ""
 
     - name: Keep Alive
       run: |
