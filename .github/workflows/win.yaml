@@ -1,47 +1,66 @@
-name: MacOS 14.4 Test Lab QVNC
+name: Windows Server 2019 RDP
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
 
 jobs:
-  rdp:
-    runs-on: windows-2022
+  build:
+    runs-on: windows-2019
+    timeout-minutes: 360  # tối đa 6h
+
     steps:
-      - name: Create user and enable RDP
-        shell: powershell
-        run: |
-          # Tạo user
-          net user blender 123456Hi /add
-          net localgroup Administrators blender /add
-          net localgroup "Remote Desktop Users" blender /add
+    - name: Enable RDP
+      run: |
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Get-Service -Name TermService | Set-Service -StartupType Automatic
+        Start-Service -Name TermService
 
-          # Bật Remote Desktop
-          Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" `
-            -Name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+    - name: Create user "blender"
+      run: |
+        net user blender 123456Hi /add
+        net localgroup administrators blender /add
+        Write-Host "✅ User 'blender' created with password '123456Hi'"
 
-      - name: Ensure OpenSSH Client
-        shell: powershell
-        run: |
-          if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
-            Write-Output "Installing OpenSSH Client..."
-            Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
-          } else {
-            Write-Output "OpenSSH Client already available."
-          }
+    - name: Optimize VPS
+      run: |
+        powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
+        powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
+        Stop-Service wuauserv; Set-Service wuauserv -StartupType Disabled
+        Stop-Service Spooler; Set-Service Spooler -StartupType Disabled
+        sc config DiagTrack start= disabled
+        sc config SysMain start= disabled
+        Write-Host "⚡ Optimization applied."
 
-      - name: Start RDP Tunnel via Pinggy
-        shell: bash
-        run: |
-          echo "🚀 Starting SSH Tunnel..."
-          ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
-              -R0:localhost:3389 tcp@a.pinggy.io &
-          TUNNEL_PID=$!
-          echo "✅ Tunnel running with PID $TUNNEL_PID"
-          echo "⚡ Wait ~5s, Pinggy will print the RDP URL below 👇"
-          sleep 10
+    - name: Download Pinggy
+      shell: powershell
+      run: |
+        Invoke-WebRequest https://github.com/pinggy-io/pinggy/releases/latest/download/pinggy-windows-amd64.exe -OutFile pinggy.exe
 
-      - name: Keep alive (72h max)
-        shell: bash
-        run: |
-          echo "🔒 Keeping workflow alive (72h limit)..."
-          while true; do sleep 300; done
+    - name: Start RDP Tunnel
+      shell: powershell
+      run: |
+        Start-Process -NoNewWindow -FilePath .\pinggy.exe -ArgumentList "-R3389:127.0.0.1:3389","-p","443","qr@free.pinggy.io"
+        Start-Sleep -Seconds 15
+        $time = Get-Date -Format "HH:mm:ss"
+        Write-Host ""
+        Write-Host "==========================="
+        Write-Host "    💻 DUO VPS - 6Hour ⏳   "
+        Write-Host " BY: 🐉 SHANGHAI & NULLTESTFUN1 ⚡"
+        Write-Host "==========================="
+        Write-Host " 🌐 HOST/IP : (xem log Pinggy ở trên)"
+        Write-Host " 👤 USER    : blender"
+        Write-Host " 🔑 PASS    : 123456Hi"
+        Write-Host " ⏱️ Max TIME: 6 Hour"
+        Write-Host "==========================="
+        Write-Host "✅ Started at $time"
+        Write-Host ""
+
+    - name: Keep Alive & Anti-ban
+      run: |
+        echo "⏳ KeepAlive running..."
+        while ($true) {
+          $rand = Get-Random -Minimum 1000 -Maximum 9999
+          Write-Host "🔹 Alive ping at $(Get-Date -Format 'HH:mm:ss') :: $rand"
+          Start-Sleep -Seconds 300
+        }
