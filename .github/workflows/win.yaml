@@ -32,11 +32,14 @@ jobs:
         sc config SysMain start= disabled
         Write-Host "⚡ Optimization applied."
 
-    - name: Download Pinggy
-      shell: powershell
+    - name: Download Pinggy (retry)
+      shell: bash
       run: |
-        Invoke-WebRequest https://github.com/pinggy-io/pinggy/releases/latest/download/pinggy-windows-amd64.exe -OutFile pinggy.exe
-
+        for i in {1..5}; do
+          curl -L --retry 5 --retry-delay 10 -o pinggy.exe https://github.com/pinggy-io/pinggy/releases/latest/download/pinggy-windows-amd64.exe && break
+          echo "Retry $i failed, waiting..."
+          sleep 10
+        done
     - name: Start RDP Tunnel
       shell: powershell
       run: |
