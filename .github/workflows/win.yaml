@@ -1,12 +1,12 @@
-name: Ubuntu 25.3.1 DEMO
+name: Ubuntu 25.0.1 DEMI
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  ssh-vps:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # max 6h
+    timeout-minutes: 360   # giữ tối đa 6h
 
     steps:
     - name: Setup system (fast)
@@ -28,10 +28,9 @@ jobs:
         sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl restart ssh
 
-    - name: Start SSH Tunnel via Pinggy
+    - name: Start Pinggy Tunnel for SSH
       shell: bash
       run: |
-        echo "⏳ Starting Pinggy tunnel..."
         ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io | tee pinggy.log &
         sleep 10
         SSH_ADDR=$(grep -m 1 "Forwarding TCP" pinggy.log | awk '{print $5}' | sed 's/tcp:\/\///')
