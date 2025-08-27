@@ -1,4 +1,4 @@
-name: Ubuntu 25.3.1 alpha
+name: Ubuntu 25.3.1 Alpha
 
 on:
   workflow_dispatch:
@@ -6,13 +6,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 360   # max 6 giờ
 
     steps:
-    - name: Setup system
+    - name: Setup system (fast)
       run: |
-        sudo apt update -y
-        sudo apt upgrade -y
+        sudo apt-get update -y
 
     - name: Create user blender
       run: |
@@ -20,12 +19,12 @@ jobs:
         echo "blender:123456Hi" | sudo chpasswd
         sudo usermod -aG sudo blender
 
-    - name: Install XFCE4 + xRDP + SSH
+    - name: Install LXDE + xRDP + SSH
       run: |
-        sudo DEBIAN_FRONTEND=noninteractive apt install -y xfce4 xfce4-goodies xrdp openssh-server
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y lxde xrdp openssh-server
         sudo systemctl enable xrdp --now
         sudo systemctl enable ssh --now
-        # Enable SSH password login
+        # Enable password login for SSH
         sudo sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl restart ssh
