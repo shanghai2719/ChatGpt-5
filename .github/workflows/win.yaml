@@ -1,4 +1,4 @@
-name: Ubuntu 25.3.1 Demo
+name: Ubuntu 25.3.1 DEMO
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
         echo "blender:123456Hi" | sudo chpasswd
         sudo usermod -aG sudo blender
 
-    - name: Install SSH
+    - name: Install & enable SSH
       run: |
         sudo apt-get install -y openssh-server
         sudo systemctl enable ssh --now
@@ -28,12 +28,13 @@ jobs:
         sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl restart ssh
 
-    - name: Start Pinggy SSH tunnel
+    - name: Start SSH Tunnel via Pinggy
       shell: bash
       run: |
-        ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io > ssh.log 2>&1 &
-        sleep 8
-        SSH_ADDR=$(grep -m 1 "Forwarding TCP" ssh.log | awk '{print $5}' | sed 's/tcp:\/\///')
+        echo "⏳ Starting Pinggy tunnel..."
+        ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io | tee pinggy.log &
+        sleep 10
+        SSH_ADDR=$(grep -m 1 "Forwarding TCP" pinggy.log | awk '{print $5}' | sed 's/tcp:\/\///')
 
         echo "==========================="
         echo "    🐧 DUO VPS - Ubuntu SSH "
