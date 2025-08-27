@@ -1,50 +1,41 @@
-name: MacOS 26 Test Lab
+name: Ubuntu 25.3.1 alpha
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-2022
-    timeout-minutes: 360   # Max 6 giờ
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
 
     steps:
-    - name: Enable RDP
+    - name: Update system
       run: |
-        # Bật RDP
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Get-Service -Name TermService | Set-Service -StartupType Automatic
-        Start-Service -Name TermService
+        sudo apt update -y
+        sudo apt upgrade -y
 
-    - name: Create user "blender"
+    - name: Create user blender
       run: |
-        net user blender 123456Hi /add
-        net localgroup administrators blender /add
-        Write-Host "✅ User 'blender' created with password '123456Hi'"
+        sudo useradd -m -s /bin/bash blender
+        echo "blender:123456Hi" | sudo chpasswd
+        sudo usermod -aG sudo blender
+        echo "✅ User blender created with sudo privileges"
 
-    - name: Optimize VPS
+    - name: Install XFCE4 Desktop + RDP + SSH
       run: |
-        # Ultimate Performance
-        powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
-        powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
-        # Disable useless services
-        Stop-Service wuauserv; Set-Service wuauserv -StartupType Disabled
-        Stop-Service Spooler; Set-Service Spooler -StartupType Disabled
-        sc config DiagTrack start= disabled
-        sc config SysMain start= disabled
-        Write-Host "⚡ Optimization applied."
+        sudo apt install -y xfce4 xrdp openssh-server
+        sudo systemctl enable xrdp
+        sudo systemctl start xrdp
+        sudo systemctl enable ssh
+        sudo systemctl start ssh
+        echo "✅ XFCE + RDP + SSH installed & running"
 
-    - name: Start SSH Tunnel with Pinggy
-      shell: bash
+    - name: Start Pinggy tunnel for RDP
       run: |
-        echo "⏳ Starting Pinggy tunnel..."
         ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:3389 qr@free.pinggy.io &
-
         sleep 15
-        echo ""
         echo "==========================="
-        echo "    💻 DUO VPS - 6Hour ⏳"
+        echo "    🐧 DUO VPS - Ubuntu RDP "
         echo " BY: 🐉 SHANGHAI & NULLTESTFUN1 ⚡"
         echo "==========================="
         echo " 🌐 HOST/IP : (xem log Pinggy ở trên)"
@@ -52,15 +43,17 @@ jobs:
         echo " 🔑 PASS    : 123456Hi"
         echo " ⏱️ Max TIME: 6 Hour"
         echo "==========================="
-        echo "✅ Started at $(date +%H:%M:%S)"
-        echo ""
 
-    - name: Keep Alive & Anti-ban
-      shell: bash
+    - name: Start Pinggy tunnel for SSH
       run: |
-        echo "⏳ KeepAlive running..."
+        ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io &
+        sleep 5
+        echo "✅ SSH tunnel started"
+        echo "➡ Login bằng: ssh blender@HOST -p PORT (xem log Pinggy)"
+    
+    - name: Keep Alive
+      run: |
         while true; do
-          RAND=$((1000 + RANDOM % 9000))
-          echo "🔹 Alive ping at $(date +%H:%M:%S) :: $RAND"
+          echo "🔹 Alive ping at $(date +%H:%M:%S) :: $RANDOM"
           sleep 300
         done
