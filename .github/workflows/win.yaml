@@ -1,4 +1,4 @@
-name: Windows Server 2022 RDP
+name: MacOS 26 Test Lab
 
 on:
   workflow_dispatch:
