@@ -1,4 +1,4 @@
-name: Ubuntu 25.0.1 DEMI
+name: Ubuntu SSH VPS
 
 on:
   workflow_dispatch:
@@ -23,15 +23,17 @@ jobs:
       run: |
         sudo apt-get install -y openssh-server
         sudo systemctl enable ssh --now
-        # enable password login
+        # Cho phép login bằng password
         sudo sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
         sudo systemctl restart ssh
 
-    - name: Start Pinggy Tunnel for SSH
+    - name: Start Pinggy SSH tunnel
       shell: bash
       run: |
-        ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:22 qr@free.pinggy.io | tee pinggy.log &
+        ssh -p 443 -R0:localhost:22 \
+            -o StrictHostKeyChecking=no -o ServerAliveInterval=30 \
+            qr@free.pinggy.io | tee pinggy.log &
         sleep 10
         SSH_ADDR=$(grep -m 1 "Forwarding TCP" pinggy.log | awk '{print $5}' | sed 's/tcp:\/\///')
 
