@@ -1,4 +1,4 @@
-name: MacOS 26 Test
+name: Windows Server 2022 RDP
 
 on:
   workflow_dispatch:
@@ -6,11 +6,12 @@ on:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 360  # tối đa 6h
+    timeout-minutes: 360   # Max 6 giờ
 
     steps:
     - name: Enable RDP
       run: |
+        # Bật RDP
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Get-Service -Name TermService | Set-Service -StartupType Automatic
@@ -24,46 +25,42 @@ jobs:
 
     - name: Optimize VPS
       run: |
+        # Ultimate Performance
         powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
         powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
+        # Disable useless services
         Stop-Service wuauserv; Set-Service wuauserv -StartupType Disabled
         Stop-Service Spooler; Set-Service Spooler -StartupType Disabled
         sc config DiagTrack start= disabled
         sc config SysMain start= disabled
         Write-Host "⚡ Optimization applied."
 
-    - name: Download Pinggy (retry)
+    - name: Start SSH Tunnel with Pinggy
       shell: bash
       run: |
-        for i in {1..5}; do
-          curl -L --retry 5 --retry-delay 10 -o pinggy.exe https://github.com/pinggy-io/pinggy/releases/latest/download/pinggy-windows-amd64.exe && break
-          echo "Retry $i failed, waiting..."
-          sleep 10
-        done
-    - name: Start RDP Tunnel
-      shell: powershell
-      run: |
-        Start-Process -NoNewWindow -FilePath .\pinggy.exe -ArgumentList "-R3389:127.0.0.1:3389","-p","443","qr@free.pinggy.io"
-        Start-Sleep -Seconds 15
-        $time = Get-Date -Format "HH:mm:ss"
-        Write-Host ""
-        Write-Host "==========================="
-        Write-Host "    DUO VPS - 6Hour    "
-        Write-Host " BY: SHANGHAI & NULLTESTFUN1 "
-        Write-Host "==========================="
-        Write-Host "  HOST/IP : (xem log Pinggy ở trên)"
-        Write-Host "  USER    : blender"
-        Write-Host "  PASS    : 123456Hi"
-        Write-Host "  Max TIME: 6 Hour"
-        Write-Host "==========================="
-        Write-Host " Started at $time"
-        Write-Host ""
+        echo "⏳ Starting Pinggy tunnel..."
+        ssh -o StrictHostKeyChecking=no -p 443 -R0:127.0.0.1:3389 qr@free.pinggy.io &
+
+        sleep 15
+        echo ""
+        echo "==========================="
+        echo "    💻 DUO VPS - 6Hour ⏳"
+        echo " BY: 🐉 SHANGHAI & NULLTESTFUN1 ⚡"
+        echo "==========================="
+        echo " 🌐 HOST/IP : (xem log Pinggy ở trên)"
+        echo " 👤 USER    : blender"
+        echo " 🔑 PASS    : 123456Hi"
+        echo " ⏱️ Max TIME: 6 Hour"
+        echo "==========================="
+        echo "✅ Started at $(date +%H:%M:%S)"
+        echo ""
 
     - name: Keep Alive & Anti-ban
+      shell: bash
       run: |
         echo "⏳ KeepAlive running..."
-        while ($true) {
-          $rand = Get-Random -Minimum 1000 -Maximum 9999
-          Write-Host "🔹 Alive ping at $(Get-Date -Format 'HH:mm:ss') :: $rand"
-          Start-Sleep -Seconds 300
-        }
+        while true; do
+          RAND=$((1000 + RANDOM % 9000))
+          echo "🔹 Alive ping at $(date +%H:%M:%S) :: $RAND"
+          sleep 300
+        done
