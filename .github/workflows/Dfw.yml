@@ -1,0 +1,20 @@
+workflows:
+  custom-vps:
+    name: Run Custom Script
+    max_build_duration: 10
+    environment:
+      vars:
+        MY_SECRET: encrypted(...)
+    scripts:
+      - name: Print System Info
+        script: |
+          echo "System Info"
+          uname -a
+          lscpu
+          free -h
+          df -h
+      - name: Run your script
+        script: |
+          echo "Running my custom commands..."
+          curl ifconfig.me
+          # Add any Linux commands here
