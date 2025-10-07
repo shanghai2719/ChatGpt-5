@@ -3,7 +3,7 @@ workflows:
     name: Windows VPS Full CI
     max_build_duration: 90
     environment:
-      os: windows
+      instance_type: windows_medium
       vars:
         PYTHON_VERSION: "3.12.7"
         SCRIPT_FILE: "my_script.py"
