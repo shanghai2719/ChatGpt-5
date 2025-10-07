@@ -1,22 +1,22 @@
 workflows:
   macos_vps_247:
     name: "macOS M4 VPS Loop Runner"
-    max_build_duration: 720  # tối đa 12h/lần build, có thể tự động khởi động lại
-    instance_type: mac_mini_m4_pro  # máy M4 Pro mạnh
+    max_build_duration: 720  # tối đa 12h/lần build (Codemagic giới hạn)
+    instance_type: mac_mini_m4  # hợp lệ theo enum chính thức
     environment:
       vars:
         LOOP_FILE: "loop.py"
         PERSIST_PATH: "/Users/builder/.persist_data"
       xcode: latest
-      cocoapods: default
-      python: 3.12
+      # python không phải field hợp lệ — dùng shell để cài Python thay thế
     triggering:
       events:
-        - manual
+        - push  # hợp lệ; dùng push thay cho manual
     scripts:
       - name: 🧱 Chuẩn bị môi trường
         script: |
-          echo "=== Chuẩn bị môi trường và thư mục lưu trữ ==="
+          echo "=== Cài Python và setup môi trường ==="
+          brew install python@3.12 || echo "Python đã có sẵn"
           mkdir -p $PERSIST_PATH
           echo "Lưu data tại: $PERSIST_PATH"
 
@@ -34,14 +34,13 @@ workflows:
               now = datetime.datetime.now().isoformat()
               print(f"[{now}] Hệ thống hoạt động ổn định.")
               
-              # Ghi log trạng thái mỗi 60 giây
               with open(LOG_FILE, "a") as f:
                   f.write(json.dumps({"time": now, "status": "running"}) + "\n")
 
               time.sleep(60)
           PYCODE
 
-      - name: 🪄 Giữ tiến trình chạy 24/7 (auto-restart)
+      - name: 🔁 Giữ tiến trình chạy 24/7 (auto-restart)
         script: |
           echo "🚀 Bắt đầu loop chạy nền"
           while true; do
