@@ -1,0 +1,82 @@
+workflows:
+  windows-vps-full:
+    name: Windows VPS Full CI
+    max_build_duration: 90        # tối đa 90 phút build
+    environment:
+      os: windows
+      vars:
+        PYTHON_VERSION: "3.12.7"
+        SCRIPT_FILE: "my_script.py"
+    scripts:
+      - name: System info
+        script: |
+          echo "=== THÔNG TIN HỆ THỐNG ==="
+          systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+          echo "User: %USERNAME%"
+          echo "Working dir: %CD%"
+          echo "==========================="
+
+      - name: Cài đặt Python và các module cần thiết
+        script: |
+          echo "=== CÀI ĐẶT PYTHON %PYTHON_VERSION% ==="
+          choco install python --version=%PYTHON_VERSION% -y
+          refreshenv
+          python --version
+          pip install --upgrade pip
+          pip install requests telebot colorama
+
+      - name: Clone hoặc pull repo phụ (nếu có)
+        script: |
+          echo "=== GIT CHECK ==="
+          if exist .git (
+            git pull
+          ) else (
+            echo "Không có repo Git để cập nhật."
+          )
+
+      - name: Chạy Python script chính
+        script: |
+          echo "=== BẮT ĐẦU CHẠY SCRIPT PYTHON ==="
+          if exist %SCRIPT_FILE% (
+            echo "Đang chạy %SCRIPT_FILE% ..."
+            python %SCRIPT_FILE%
+            echo "Script kết thúc thành công."
+          ) else (
+            echo "⚠️ Không tìm thấy %SCRIPT_FILE% trong thư mục gốc!"
+          )
+
+      - name: Ghi log & tổng hợp kết quả
+        script: |
+          echo "=== GHI LOG ==="
+          echo Build Time: %DATE% %TIME% > build_log.txt
+          echo User: %USERNAME% >> build_log.txt
+          echo System: %PROCESSOR_IDENTIFIER% >> build_log.txt
+          echo Done >> build_log.txt
+
+      # Hook mở rộng – ví dụ gửi log lên Telegram
+      - name: (Tùy chọn) Gửi log về Telegram
+        script: |
+          echo "=== GỬI LOG TELEGRAM (nếu muốn) ==="
+          if defined TELEGRAM_TOKEN (
+            echo "Token tồn tại, gửi log..."
+            python - <<END
+import requests, os
+token = os.getenv("8438130882:AAEmgOVt1Hc2nQbKMPWUV8l6PRPkBrYtTjM")
+chat_id = os.getenv("-1002693327446")
+msg = f"✅ Build trên Codemagic Windows đã xong!\nUser: {os.getenv('USERNAME')}"
+requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": msg})
+END
+          ) else (
+            echo "Không có Telegram token, bỏ qua bước này."
+          )
+
+      - name: Cleanup cuối
+        script: |
+          echo "=== DỌN DẸP ==="
+          dir
+          echo "Hoàn tất build Windows VPS CI!"
+
+    artifacts:
+      - ./*.txt
+      - ./*.log
+      - ./output/**
