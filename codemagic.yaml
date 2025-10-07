@@ -58,19 +58,17 @@ workflows:
         script: |
           echo "=== GỬI LOG TELEGRAM (nếu có biến môi trường) ==="
           if defined TELEGRAM_TOKEN (
-            echo "Token tồn tại, gửi log..."
-            python - <<EOF
-import os, requests
-token = os.getenv("8438130882:AAEmgOVt1Hc2nQbKMPWUV8l6PRPkBrYtTjM")
-chat_id = os.getenv("-1002693327446")
-msg = f"✅ Build trên Codemagic Windows đã hoàn tất!\nUser: {os.getenv('USERNAME')}\nBuild path: {os.getcwd()}"
-try:
-    r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
-                      json={"chat_id": chat_id, "text": msg})
-    print("Đã gửi log Telegram thành công!", r.status_code)
-except Exception as e:
-    print("Lỗi khi gửi Telegram:", e)
-EOF
+            echo "Token tồn tại, tạo file tạm telegram_send.py"
+            echo import os, requests> telegram_send.py
+            echo token = os.getenv("8438130882:AAEmgOVt1Hc2nQbKMPWUV8l6PRPkBrYtTjM")>> telegram_send.py
+            echo chat_id = os.getenv("-1002693327446")>> telegram_send.py
+            echo msg = f"✅ Build hoàn tất trên Codemagic Windows!\nUser: {os.getenv('USERNAME')}\nBuild path: {os.getcwd()}" >> telegram_send.py
+            echo try:>> telegram_send.py
+            echo.    r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": msg})>> telegram_send.py
+            echo.    print("Đã gửi Telegram:", r.status_code)>> telegram_send.py
+            echo except Exception as e:>> telegram_send.py
+            echo.    print("Lỗi Telegram:", e)>> telegram_send.py
+            python telegram_send.py
           ) else (
             echo "Không có TELEGRAM_TOKEN, bỏ qua bước này."
           )
