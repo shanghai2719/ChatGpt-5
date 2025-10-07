@@ -1,7 +1,7 @@
 workflows:
   macos_vps_247:
     name: "macOS M4 VPS Loop Runner (auto-restart by hours)"
-    max_build_duration: 120   # giới hạn Codemagic 2 giờ
+    max_build_duration: 9999999999   # giới hạn Codemagic 2 giờ
     instance_type: mac_mini_m2
     environment:
       vars:
