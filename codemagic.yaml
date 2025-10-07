@@ -1,49 +1,67 @@
 workflows:
   macos_vps_247:
-    name: "macOS M4 VPS Loop Runner"
-    max_build_duration: 720  # tối đa 12h/lần build (Codemagic giới hạn)
-    instance_type: mac_mini_m4  # hợp lệ theo enum chính thức
+    name: "macOS M4 VPS Loop Runner (auto-restart by hours)"
+    max_build_duration: 120   # giới hạn Codemagic 2 giờ
+    instance_type: mac_mini_m4
     environment:
       vars:
         LOOP_FILE: "loop.py"
         PERSIST_PATH: "/Users/builder/.persist_data"
+        MAX_HOURS: "1.9"  # 1.9 giờ ≈ 1h54m, tự restart trước khi timeout
       xcode: latest
-      # python không phải field hợp lệ — dùng shell để cài Python thay thế
     triggering:
       events:
-        - push  # hợp lệ; dùng push thay cho manual
+        - push
     scripts:
-      - name: 🧱 Chuẩn bị môi trường
+      - name: 🧱 Setup môi trường
         script: |
-          echo "=== Cài Python và setup môi trường ==="
-          brew install python@3.12 || echo "Python đã có sẵn"
+          echo "=== Setup Python và thư mục lưu data ==="
+          brew install python@3.12 || echo "Python có sẵn"
           mkdir -p $PERSIST_PATH
-          echo "Lưu data tại: $PERSIST_PATH"
 
-      - name: 🐍 Tạo file loop Python (chạy nền 24/7)
+      - name: 🐍 Tạo file loop Python
         script: |
           cat > $LOOP_FILE <<'PYCODE'
-          import os, time, datetime, json
+          import os, time, datetime, json, subprocess
 
           DATA_PATH = os.environ.get("PERSIST_PATH", "/Users/builder/.persist_data")
           LOG_FILE = os.path.join(DATA_PATH, "loop_log.json")
+          MAX_HOURS = float(os.environ.get("MAX_HOURS", "1.9"))
+          RUNTIME_LIMIT = MAX_HOURS * 3600  # quy đổi ra giây
 
           print("🌀 VPS Loop Runner khởi động...")
+          start_time = time.time()
+          os.makedirs(DATA_PATH, exist_ok=True)
 
           while True:
               now = datetime.datetime.now().isoformat()
-              print(f"[{now}] Hệ thống hoạt động ổn định.")
-              
+              uptime = time.time() - start_time
+              print(f"[{now}] Hệ thống hoạt động ổn định ({uptime/3600:.2f}h).")
+
               with open(LOG_FILE, "a") as f:
-                  f.write(json.dumps({"time": now, "status": "running"}) + "\n")
+                  f.write(json.dumps({"time": now, "status": "running", "uptime_hr": uptime/3600}) + "\n")
+
+              if uptime >= RUNTIME_LIMIT:
+                  print(f"🔁 Đã đạt giới hạn {MAX_HOURS} giờ — chuẩn bị tự khởi động lại build...")
+                  break
 
               time.sleep(60)
+
+          token = os.environ.get("CM_API_TOKEN")
+          app_id = os.environ.get("CM_APP_ID")
+          if token and app_id:
+              print("📡 Gửi yêu cầu khởi động lại build tới Codemagic API...")
+              subprocess.call([
+                  "curl", "-X", "POST",
+                  "https://api.codemagic.io/builds",
+                  "-H", "Content-Type: application/json",
+                  "-H", f"x-auth-token: {token}",
+                  "-d", f'{{"appId":"{app_id}","workflowId":"macos_vps_247"}}'
+              ])
+          else:
+              print("⚠️ Thiếu CM_API_TOKEN hoặc CM_APP_ID — không thể tự restart.")
           PYCODE
 
-      - name: 🔁 Giữ tiến trình chạy 24/7 (auto-restart)
+      - name: 🚀 Chạy loop
         script: |
-          echo "🚀 Bắt đầu loop chạy nền"
-          while true; do
-            python3 $LOOP_FILE || echo "⚠️ Loop dừng — khởi động lại sau 5s"
-            sleep 5
-          done
+          python3 $LOOP_FILE
