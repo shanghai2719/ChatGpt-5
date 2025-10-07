@@ -1,0 +1,12 @@
+workflows:
+  android-build:
+    name: Build Android APK with Codemagic
+    max_build_duration: 20
+    environment:
+      vars:
+        JAVA_HOME: /usr/lib/jvm/java-11-openjdk-amd64
+    scripts:
+      - name: Build APK
+        script: ./gradlew assembleDebug
+    artifacts:
+      - app/build/outputs/apk/debug/app-debug.apk
