@@ -1,86 +1,42 @@
-workflows:
-  windows-vps-full:
-    name: Windows VPS Full CI
-    max_build_duration: 90
-    instance_type: windows_x2
+name: Keepalive 24/7 (90m cycle)
 
-    environment:
-      vars:
-        PYTHON_VERSION: "3.12.7"
-        SCRIPT_FILE: "my_script.py"
+# Chạy theo 2 cron entries để cover mỗi 90 phút:
+on:
+  schedule:
+    - cron: '0 0,3,6,9,12,15,18,21 * * *'    # at 00:00,03:00,06:00,... (minute 0)
+    - cron: '30 1,4,7,10,13,16,19,22 * * *'  # at 01:30,04:30,07:30,...
+  workflow_dispatch: # cho phép kick tay (manual)
 
-    scripts:
-      - name: System info
-        script: |
-          echo "=== THÔNG TIN HỆ THỐNG ==="
-          systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
-          echo "User: %USERNAME%"
-          echo "Working dir: %CD%"
-          echo "==========================="
+jobs:
+  run-long-script:
+    runs-on: ubuntu-latest
+    timeout-minutes: 95        # bảo đảm job bị kill nếu vượt 95 phút
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Cài đặt Python và module cần thiết
-        script: |
-          echo "=== CÀI ĐẶT PYTHON %PYTHON_VERSION% ==="
-          choco install python --version=%PYTHON_VERSION% -y
-          refreshenv
-          python --version
-          pip install --upgrade pip
-          pip install requests telebot colorama
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13.7"
 
-      - name: Kiểm tra hoặc cập nhật Git repo
-        script: |
-          echo "=== GIT CHECK ==="
-          if exist .git (
-            git pull
-          ) else (
-            echo "Không có repo Git để cập nhật."
-          )
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
 
-      - name: Chạy script Python chính
-        script: |
-          echo "=== BẮT ĐẦU CHẠY SCRIPT PYTHON ==="
-          if exist %SCRIPT_FILE% (
-            echo "Đang chạy %SCRIPT_FILE% ..."
-            python %SCRIPT_FILE%
-            echo "Script kết thúc thành công."
-          ) else (
-            echo "⚠️ Không tìm thấy %SCRIPT_FILE% trong thư mục gốc!"
-          )
+      - name: Run long script with timeout (~80 minutes)
+        # 'timeout' sẽ kill process sau 80 phút (80m). Điều chỉnh theo nhu cầu.
+        run: |
+          echo "Starting long-run job (max 80 minutes)..."
+          # nếu bạn dùng Windows-specific commands, thay runner hoặc dùng windows-latest
+          timeout 80m python my_script.py || echo "Script ended or timed out."
 
-      - name: Ghi log build
-        script: |
-          echo "=== GHI LOG ==="
-          echo Build Time: %DATE% %TIME% > build_log.txt
-          echo User: %USERNAME% >> build_log.txt
-          echo System: %PROCESSOR_IDENTIFIER% >> build_log.txt
-          echo Done >> build_log.txt
-
-      - name: Gửi thông báo Telegram (tùy chọn)
-        script: |
-          echo "=== GỬI LOG TELEGRAM (nếu có biến môi trường) ==="
-          if defined TELEGRAM_TOKEN (
-            echo "Token tồn tại, tạo file tạm telegram_send.py"
-            echo import os, requests> telegram_send.py
-            echo token = os.getenv("8438130882:AAEmgOVt1Hc2nQbKMPWUV8l6PRPkBrYtTjM")>> telegram_send.py
-            echo chat_id = os.getenv("-1002693327446")>> telegram_send.py
-            echo msg = f"✅ Build hoàn tất trên Codemagic Windows!\nUser: {os.getenv('USERNAME')}\nBuild path: {os.getcwd()}" >> telegram_send.py
-            echo try:>> telegram_send.py
-            echo.    r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": msg})>> telegram_send.py
-            echo.    print("Đã gửi Telegram:", r.status_code)>> telegram_send.py
-            echo except Exception as e:>> telegram_send.py
-            echo.    print("Lỗi Telegram:", e)>> telegram_send.py
-            python telegram_send.py
-          ) else (
-            echo "Không có TELEGRAM_TOKEN, bỏ qua bước này."
-          )
-
-      - name: Cleanup cuối
-        script: |
-          echo "=== DỌN DẸP ==="
-          dir
-          echo "Hoàn tất build Windows VPS CI!"
-
-    artifacts:
-      - ./*.txt
-      - ./*.log
-      - ./output/**
+      - name: Upload result artifacts (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: keepalive-logs
+          path: |
+            result.log
+            build_log.txt
